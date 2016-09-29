@@ -1,6 +1,6 @@
 /*
-Title: Sky Boxes
-File Name: skyboxFragment.glsl
+Title: Specular Maps
+File Name: fragment.glsl
 Copyright ? 2016
 Author: David Erbelding
 Written under the supervision of David I. Schwartz, Ph.D., and
@@ -22,15 +22,30 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #version 400 core
 
 in vec3 position;
+in vec2 uv;
+in mat3 tbn;
 
-// This is what a cubemap texture sampler looks like:
+uniform sampler2D normalMap;
 uniform samplerCube cubeMap;
+
+// Camera position is required for reflection the same way it's used for specular shading
+uniform vec3 cameraPosition;
 
 void main(void)
 {
-	gl_FragColor = texture(cubeMap, -position);
+	// calculate normal from normal map
+	vec3 texnorm = normalize(vec3(texture(normalMap, uv)) * 2.0 - 1.0);
+	vec3 norm = tbn * texnorm;
+
+	// This part should mostly make sense.
+	// We get a vector from the surface to the camera position.
+	vec3 surfaceToEye = cameraPosition - position;
+	// Reflect that vector over the surface normal, giving us the direction light would be reflecting to our eye from
+	vec3 outVec = reflect(surfaceToEye, norm);
+	
+	// We use that direction vector to read from the cube map (like a backwards skybox)
+	gl_FragColor = texture(cubeMap, outVec);
 }

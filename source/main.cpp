@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	glfwInit();
 
 	// Initialize window
-	GLFWwindow* window = glfwCreateWindow(viewportDimensions.x, viewportDimensions.y, "Shiny", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(viewportDimensions.x, viewportDimensions.y, "Shiny++", nullptr, nullptr);
 	glfwMakeContextCurrent(window);
 
 	// Set window callbacks
@@ -82,9 +82,12 @@ int main(int argc, char **argv)
 
     // The transform being used to draw our second shape.
     Transform3D transform;
-    transform.SetPosition(glm::vec3(0, 0, -2));
+    transform.SetPosition(glm::vec3(1, 0, -2));
     transform.RotateX(1.5);
 
+    Transform3D transform2;
+    transform2.SetPosition(glm::vec3(-1, 0, -2));
+    transform2.RotateX(1.5);
 
     // Make a first person controller for the camera.
     FPSController controller = FPSController();
@@ -92,35 +95,33 @@ int main(int argc, char **argv)
 
 	// Create Shaders
     Shader* vertexShader = new Shader("../shaders/vertex.glsl", GL_VERTEX_SHADER);
-    Shader* fragmentShader = new Shader("../shaders/fragment.glsl", GL_FRAGMENT_SHADER);
-
+    Shader* fragmentShader = new Shader("../shaders/specFrag.glsl", GL_FRAGMENT_SHADER);
 
     // Create A Shader Program
-    // The class wraps all of the functionality of a gl shader program.
     ShaderProgram* shaderProgram = new ShaderProgram();
     shaderProgram->AttachShader(vertexShader);
     shaderProgram->AttachShader(fragmentShader);
 
 
     // Create a material using a texture for our model
-    Material* material = new Material(shaderProgram);
-    material->SetTexture("diffuseMap", new Texture("../assets/iron_buckler_diffuse.png"));
-    material->SetTexture("normalMap", new Texture("../assets/iron_buckler_normal.png"));
-    material->SetTexture("specularMap", new Texture("../assets/iron_buckler_specular.png"));
-    material->SetInt("specularExponent", 64);
+    Material* specMat = new Material(shaderProgram);
+    specMat->SetTexture("diffuseMap", new Texture("../assets/iron_buckler_diffuse.png"));
+    Texture* texNorm = new Texture("../assets/iron_buckler_normal.png");
+    specMat->SetTexture("normalMap", texNorm);
+    specMat->SetTexture("specularMap", new Texture("../assets/iron_buckler_specular.png"));
+    specMat->SetInt("specularExponent", 64);
 
 
     Shader* skyboxVertexShader = new Shader("../shaders/skyboxvertex.glsl", GL_VERTEX_SHADER);
     Shader* skyboxfragmentShader = new Shader("../shaders/skyboxfragment.glsl", GL_FRAGMENT_SHADER);
 
 
-    // Create A Shader Program
-    // The class wraps all of the functionality of a gl shader program.
+    // Create A Shader Program for the skybox
     ShaderProgram* skyboxShaderProgram = new ShaderProgram();
     skyboxShaderProgram->AttachShader(skyboxVertexShader);
     skyboxShaderProgram->AttachShader(skyboxfragmentShader);
 
-
+    // Create material for skybox
     Material* skyMat = new Material(skyboxShaderProgram);
     std::vector<char*> faceFilePaths;
     faceFilePaths.push_back("../assets/skyboxLeft.png");
@@ -129,7 +130,25 @@ int main(int argc, char **argv)
     faceFilePaths.push_back("../assets/skyboxTop.png");
     faceFilePaths.push_back("../assets/skyboxBack.png");
     faceFilePaths.push_back("../assets/skyboxFront.png");
-    skyMat->SetCubeMap("cubeMap", new CubeMap(faceFilePaths));
+
+    // The cube map class just saves time by holding all the previous cube map loading code
+    CubeMap* sky = new CubeMap(faceFilePaths);
+    skyMat->SetCubeMap("cubeMap", sky);
+
+
+    // Create a shaders for reflection
+    Shader* reflectFrag = new Shader("../shaders/reflectFrag.glsl", GL_FRAGMENT_SHADER);
+    ShaderProgram* reflectiveSurface = new ShaderProgram();
+    reflectiveSurface->AttachShader(vertexShader);
+    reflectiveSurface->AttachShader(reflectFrag);
+
+    // Set up material:
+    // A mirror-like surface needs a cube map to get reflect
+    // Normal maps aren't required, but we might as well use one to get a more detailed surface
+    Material* reflectMat = new Material(reflectiveSurface);
+    reflectMat->SetCubeMap("cubeMap", sky);
+    reflectMat->SetTexture("normalMap", texNorm);
+
 
     // Print instructions to the console.
     std::cout << "Use WASD to move, and the mouse to look around." << std::endl;
@@ -155,6 +174,7 @@ int main(int argc, char **argv)
 
         // rotate cube transform
         transform.RotateY(1.0f * dt);
+        transform2.RotateY(1.0f * dt);
 
 
 
@@ -174,16 +194,27 @@ int main(int argc, char **argv)
 
         // Set the camera and world matrices to the shader
         // The string names correspond directly to the uniform names within the shader.
-        material->SetMatrix("cameraView", viewProjection);
-        material->SetMatrix("worldMatrix", transform.GetMatrix());
+        specMat->SetMatrix("cameraView", viewProjection);
+        specMat->SetMatrix("worldMatrix", transform.GetMatrix());
 
         // For specularity, we also need the position of the camera to calculate reflections
-        material->SetVec3("cameraPosition", controller.GetTransform().Position());
+        specMat->SetVec3("cameraPosition", controller.GetTransform().Position());
 
         // Bind the material
-        material->Bind();
+        specMat->Bind();
         model->Draw();
-        material->Unbind();
+        specMat->Unbind();
+
+
+        // Reflection works very similarly to specularity
+        reflectMat->SetMatrix("cameraView", viewProjection);
+        reflectMat->SetMatrix("worldMatrix", transform2.GetMatrix());
+        reflectMat->SetVec3("cameraPosition", controller.GetTransform().Position());
+
+        reflectMat->Bind();
+        model->Draw();
+        reflectMat->Unbind();
+
 
         // Draw the skybox
         glm::mat4 specialView = projection * glm::mat4(glm::mat3(view));
@@ -204,12 +235,14 @@ int main(int argc, char **argv)
 		glfwPollEvents();
 	}
 
+    // Delete mesh objects
     delete model;
     delete cube;
 
-    // Free material should free all objects used by material
-    delete material;
+    // Free memory used by materials and all sub objects
+    delete specMat;
     delete skyMat;
+    delete reflectMat;
 
 	// Free GLFW memory.
 	glfwTerminate();

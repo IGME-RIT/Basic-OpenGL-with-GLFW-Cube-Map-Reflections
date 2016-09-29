@@ -1,7 +1,6 @@
-# Basic OpenGL with GLFW: Specular Maps
+# Basic OpenGL with GLFW: Cube Map Reflections
 
-Building from the normal map example, we apply specular maps, making some surfaces reflect light and appear shiny.
-This uses a blinn-phong shader
+Using cube maps, and reflection like that in the specular maps example, we can simulate models with reflective surfaces.
 
 # Setup
 
