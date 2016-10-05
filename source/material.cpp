@@ -101,7 +101,7 @@ void Material::SetCubeMap(char * name, CubeMap* cubeMap)
     cubeMap->IncRefCount();
 
     // Search through current uniforms to find a match.
-    for (int i = 0; i < m_textureUniforms.size(); i++)
+    for (int i = 0; i < m_cubeMapUniforms.size(); i++)
     {
         // If there's a match replace the cubeMap.
         if (m_cubeMapUniforms[i] == uniform)
@@ -324,14 +324,16 @@ void Material::Bind()
     // Bind all cubeMaps
     for (int i = 0; i < m_cubeMaps.size(); i++)
     {
-        // This enum value can be incremented to bind to different texture locations
-        glActiveTexture(GL_TEXTURE0 + i);
+        // IMPORTANT, these textures overlap with the previous textures, so we need to
+        // start at the end of the previous colleciton.
+        // For some reason, using the same indices worked on my integrated graphics chip???
+        glActiveTexture(GL_TEXTURE0 + m_textureUniforms.size() + i);
 
         // Bind the texture
         glBindTexture(GL_TEXTURE_CUBE_MAP, m_cubeMaps[i]->GetGLCubeMap());
         
         // Use the the texture from GL_TEXTURE0 + i at the given texture uniform location.
-        glUniform1i(m_cubeMapUniforms[i], i);
+        glUniform1i(m_cubeMapUniforms[i], m_textureUniforms.size() + i);
     }
 
     // Set all matrix data
