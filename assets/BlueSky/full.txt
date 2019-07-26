@@ -1,0 +1,1 @@
+full skybox of all 6 images in one texture, does not exist for this skybox

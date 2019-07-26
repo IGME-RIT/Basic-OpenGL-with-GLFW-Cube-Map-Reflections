@@ -1,0 +1,9 @@
+Get textures here:
+http://scmapdb.com/skies/p/2
+
+Screenshot all 6 sides, just eye-ball it
+
+Then go here to convert them all to the same square resolution
+https://image.online-convert.com/convert-to-png
+
+If they aren't all the same, the cubemap wont draw
